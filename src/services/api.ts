@@ -16,6 +16,7 @@ export type ApiRequestOptions = {
   token?: string | null;
   transport?: "cookie" | "bearer";
   notifyUnauthorized?: boolean;
+  retried?: boolean;
 };
 
 type ClientOptions = { platform?: "web" | "native"; baseUrl?: string; fetcher?: typeof fetch };
@@ -25,6 +26,7 @@ export class ApiClient {
   private revision = 0;
   private token: string | null = null;
   private listeners = new Set<(revision: number) => void>();
+  private refresher: (() => Promise<boolean>) | null = null;
 
   constructor(private readonly options: ClientOptions = {}) {
     this.isWeb = (options.platform ?? (Platform.OS === "web" ? "web" : "native")) === "web";
@@ -33,6 +35,14 @@ export class ApiClient {
   replaceSession(token: string | null): number {
     this.token = this.isWeb ? null : token;
     return ++this.revision;
+  }
+  // Renova o access token sem trocar de sessão (a revisão não muda, então 401 antigos continuam ignorados).
+  setAccessToken(token: string | null): void {
+    if (!this.isWeb) this.token = token;
+  }
+  // Chamado em um 401 de requisição autenticada; se devolver true, a requisição é repetida uma vez.
+  setRefresher(refresher: (() => Promise<boolean>) | null): void {
+    this.refresher = refresher;
   }
   onUnauthorized(listener: (revision: number) => void): () => void {
     this.listeners.add(listener);
@@ -66,6 +76,10 @@ export class ApiClient {
       if (response.ok) throw new ApiError(response.status, "A API retornou uma resposta inválida.", "invalid-response");
     }
     if (!response.ok) {
+      if (response.status === 401 && authenticated && !options.retried && options.token === undefined
+        && this.refresher && await this.refresher()) {
+        return this.request<T>(path, { ...options, retried: true });
+      }
       if (response.status === 401 && authenticated && options.notifyUnauthorized !== false) {
         for (const listener of this.listeners) listener(revision);
       }
