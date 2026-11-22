@@ -7,6 +7,7 @@ export interface SessionStorage {
   clear(): Promise<void>;
 }
 
+// No app nativo, guarda só o refresh token; o access token (JWT, 15 min) fica apenas em memória.
 const SESSION_KEY = "gamelist.session";
 const OPTIONS = { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY };
 

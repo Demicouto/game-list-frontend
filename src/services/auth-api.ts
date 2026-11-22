@@ -1,15 +1,25 @@
 import { ApiError, apiClient, type ApiClient } from "./api";
-import type { LoginInput, LoginResponse, RegisterInput, RegistrationResponse, SessionResponse } from "../types/auth";
+import type { LoginInput, LoginResponse, RefreshResponse, RegisterInput, RegistrationResponse, SessionResponse } from "../types/auth";
 
 export interface AuthApi {
   register(input: RegisterInput, signal?: AbortSignal): Promise<RegistrationResponse>;
   login(input: LoginInput, signal?: AbortSignal): Promise<LoginResponse>;
   me(signal?: AbortSignal): Promise<SessionResponse>;
-  logout(token?: string, signal?: AbortSignal): Promise<void>;
+  refresh(refreshToken?: string, signal?: AbortSignal): Promise<RefreshResponse>;
+  logout(refreshToken?: string, signal?: AbortSignal): Promise<void>;
 }
 
 function invalidResponse(): never {
   throw new ApiError(502, "A API retornou uma resposta de autenticação inválida.", "invalid-response");
+}
+
+const REFRESH_TOKEN = /^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/;
+
+function parseTokens(value: unknown): { accessToken: string; refreshToken: string } {
+  if (!value || typeof value !== "object" || !("accessToken" in value) || typeof value.accessToken !== "string"
+    || !value.accessToken || !("refreshToken" in value) || typeof value.refreshToken !== "string"
+    || !REFRESH_TOKEN.test(value.refreshToken)) return invalidResponse();
+  return { accessToken: value.accessToken, refreshToken: value.refreshToken };
 }
 
 function parseSession(value: unknown): SessionResponse {
@@ -40,15 +50,23 @@ export function createAuthApi(client: ApiClient): AuthApi {
       });
       const session = parseSession(result);
       if (client.isWeb) return session;
-      if (!result || typeof result !== "object" || !("token" in result) || typeof result.token !== "string"
-        || !/^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/.test(result.token)) return invalidResponse();
-      return { ...session, token: result.token };
+      return { ...session, ...parseTokens(result) };
     },
     async me(signal) {
       return parseSession(await client.request<unknown>("/auth/me", { signal }));
     },
-    async logout(token, signal) {
-      await client.request<void>("/auth/logout", { method: "POST", token, signal, notifyUnauthorized: false });
+    async refresh(refreshToken, signal) {
+      const result = await client.request<unknown>("/auth/refresh", {
+        method: "POST", body: client.isWeb ? undefined : { refreshToken }, authenticated: false, notifyUnauthorized: false, signal,
+      });
+      if (!result || typeof result !== "object" || !("expiresAt" in result) || typeof result.expiresAt !== "string"
+        || !Number.isFinite(Date.parse(result.expiresAt))) return invalidResponse();
+      return client.isWeb ? { expiresAt: result.expiresAt } : { expiresAt: result.expiresAt, ...parseTokens(result) };
+    },
+    async logout(refreshToken, signal) {
+      await client.request<void>("/auth/logout", {
+        method: "POST", body: refreshToken ? { refreshToken } : undefined, authenticated: false, notifyUnauthorized: false, signal,
+      });
     },
   };
 }
