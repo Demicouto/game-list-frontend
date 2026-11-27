@@ -8,7 +8,6 @@ import { useEffect, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -184,7 +183,7 @@ function GameForm({ existingGame, preset }: { existingGame?: Game; preset?: Game
       <StatusBar style="light" />
       <SafeAreaView edges={["top", "left", "right"]} className="flex-1">
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          behavior="padding"
           className="flex-1"
         >
           <ScrollView
