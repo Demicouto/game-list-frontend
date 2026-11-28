@@ -1,7 +1,7 @@
 import { ApiError } from "./api";
 import type { GamesApi } from "./games-api";
 import type { LocalCovers } from "./local-covers";
-import { resolveLocalCover } from "./local-covers";
+import { isLocalCoverUri, resolveLocalCover } from "./local-covers";
 import { findPresetForGame } from "../data/game-presets";
 import type { CreateGameInput, Game, GamePlatform, GameStatus, UpdateGameInput } from "../types/game";
 
@@ -19,6 +19,9 @@ export function cancelledGameRequest() {
   error.name = "AbortError";
   return error;
 }
+
+// A API aceita JPEG, PNG e WebP; SVG e predefinidos continuam só no aparelho.
+const isUploadable = (uri: string) => isLocalCoverUri(uri) && !/\.svg(?:$|[?#])|^data:image\/svg/i.test(uri);
 
 export class GamesStore {
   private state: GamesState = { ownerId: null, revision: -1, games: [], platforms: [], loading: false, error: null, warning: null };
@@ -129,12 +132,28 @@ export class GamesStore {
     const ownerId = this.state.ownerId!;
     let covered: Game;
     if (uri === undefined) covered = await this.overlay(game, revision);
-    else {
-      try { await this.covers.write(ownerId, game.id, uri === null ? "none" : uri); }
-      catch { if (this.current(revision)) this.update({ warning: "O jogo foi salvo, mas a capa local não pôde ser mantida. Selecione a imagem novamente para tentar salvar a capa." }); }
-      covered = uri ? { ...game, cover: resolveLocalCover(uri), localCoverReference: uri } : game;
-    }
+    else covered = (uri && isUploadable(uri) ? await this.uploadCover(game, uri, ownerId, revision) : null)
+      ?? await this.keepLocalCover(game, uri, ownerId, revision);
     this.assertCurrent(revision); this.upsert(covered); return covered;
+  }
+  private async keepLocalCover(game: Game, uri: string | null, ownerId: string, revision: number): Promise<Game> {
+    try { await this.covers.write(ownerId, game.id, uri === null ? "none" : uri); }
+    catch { if (this.current(revision)) this.update({ warning: "O jogo foi salvo, mas a capa local não pôde ser mantida. Selecione a imagem novamente para tentar salvar a capa." }); }
+    return uri ? { ...game, cover: resolveLocalCover(uri), localCoverReference: uri } : game;
+  }
+  // Com a capa no servidor, o overlay local deixa de ser necessário. Se o envio falhar, a capa continua só neste aparelho.
+  private async uploadCover(game: Game, uri: string, ownerId: string, revision: number): Promise<Game | null> {
+    try {
+      const uploaded = await this.api.cover(game.id, uri, this.controller.signal);
+      this.assertCurrent(revision);
+      await this.covers.remove(ownerId, game.id).catch(() => undefined);
+      return uploaded;
+    } catch (error) {
+      this.assertCurrent(revision);
+      const reason = error instanceof ApiError ? (error.status === 413 ? "a imagem passa de 2 MB" : error.message) : "";
+      this.update({ warning: `O jogo foi salvo, mas não foi possível enviar a capa${reason ? ` (${reason})` : ""}. Ela continua só neste dispositivo.` });
+      return null;
+    }
   }
   private async overlay(game: Game, revision: number): Promise<Game> {
     this.assertCurrent(revision);
