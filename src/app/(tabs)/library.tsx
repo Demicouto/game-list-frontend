@@ -1,12 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FlatList, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { GameCard } from "../../components/GameCard";
 import { GameStatusSheet } from "../../components/GameStatusSheet";
 import SearchBar from "../../components/SearchBar";
+import { BottomNav, BOTTOM_NAV_SPACE } from "../../components/BottomNav";
 import { useGames } from "../../context/GamesContext";
 import type { GameStatus } from "../../types/game";
 import { GamesFeedback } from "../../components/GamesFeedback";
@@ -36,7 +37,11 @@ export default function LibraryPage() {
   const { width } = useWindowDimensions();
   const { games, loading, error, warning, reload } = useGames();
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<LibraryFilter>("all");
+  // Outra tela pode abrir a biblioteca já filtrada, ex.: /library?filter=favorites (Perfil → "Ver todos").
+  const params = useLocalSearchParams<{ filter?: string }>();
+  const initialFilter = FILTERS.find(item => item.key === params.filter)?.key ?? "all";
+  const [filter, setFilter] = useState<LibraryFilter>(initialFilter);
+  useEffect(() => { setFilter(initialFilter); }, [initialFilter]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const contentWidth = Math.min(width - insets.left - insets.right, MAX_WIDTH);
   const cardWidth = (contentWidth - PADDING * 2 - GAP) / 2;
@@ -75,7 +80,7 @@ export default function LibraryPage() {
             alignSelf: "center",
             paddingHorizontal: PADDING,
             paddingTop: 16,
-            paddingBottom: Math.max(insets.bottom, 16) + 24,
+            paddingBottom: BOTTOM_NAV_SPACE + insets.bottom,
             gap: 24,
             flexGrow: 1,
           }}
@@ -176,6 +181,7 @@ export default function LibraryPage() {
           )}
         />
       </SafeAreaView>
+      <BottomNav active="library" />
       <GameStatusSheet gameId={selectedId} onClose={() => setSelectedId(null)} />
     </View>
   );

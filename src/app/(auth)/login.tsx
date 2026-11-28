@@ -7,7 +7,6 @@ import { ApiError } from "../../services/api";
 import { passwordBytes } from "../../auth/password-policy";
 import {
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -139,7 +138,7 @@ export function LoginScreen() {
       <SafeAreaView edges={["top", "left", "right"]} className="flex-1">
         <KeyboardAvoidingView
           className="flex-1"
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          behavior="padding"
         >
           <ScrollView
             keyboardShouldPersistTaps="handled"
