@@ -7,6 +7,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { GameCard } from "../../components/GameCard";
 import { GameStatusSheet } from "../../components/GameStatusSheet";
 import SearchBar from "../../components/SearchBar";
+import { BottomNav, BOTTOM_NAV_SPACE } from "../../components/BottomNav";
 import { useGames } from "../../context/GamesContext";
 import type { GameStatus } from "../../types/game";
 import { GamesFeedback } from "../../components/GamesFeedback";
@@ -75,7 +76,7 @@ export default function LibraryPage() {
             alignSelf: "center",
             paddingHorizontal: PADDING,
             paddingTop: 16,
-            paddingBottom: Math.max(insets.bottom, 16) + 24,
+            paddingBottom: BOTTOM_NAV_SPACE + insets.bottom,
             gap: 24,
             flexGrow: 1,
           }}
@@ -176,6 +177,7 @@ export default function LibraryPage() {
           )}
         />
       </SafeAreaView>
+      <BottomNav active="library" />
       <GameStatusSheet gameId={selectedId} onClose={() => setSelectedId(null)} />
     </View>
   );

@@ -3,13 +3,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BottomNav, BOTTOM_NAV_SPACE } from '../../components/BottomNav';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError } from '../../services/api';
 
 export default function ProfilePage() {
   const { user, logout } = useAuth();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pending = useRef(false);
@@ -23,9 +25,10 @@ export default function ProfilePage() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-[#0A0D14]">
+    <View className="flex-1 bg-[#0A0D14]">
       <StatusBar style="light" />
-      <ScrollView contentContainerStyle={{ padding: 24 }}>
+      <SafeAreaView edges={['top', 'left', 'right']} className="flex-1">
+      <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: BOTTOM_NAV_SPACE + insets.bottom }}>
         <View className="mx-auto w-full max-w-[480px] gap-5">
           <Pressable accessibilityRole="button" accessibilityLabel="Voltar ao início"
             className="h-11 w-11 items-center justify-center rounded-full border border-[#252C3C] bg-[#181D28] active:opacity-80" onPress={() => router.replace('/home')}>
@@ -45,6 +48,8 @@ export default function ProfilePage() {
           </Pressable>
         </View>
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+      <BottomNav active="profile" />
+    </View>
   );
 }

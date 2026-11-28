@@ -9,7 +9,7 @@ import { GameCard } from "../../components/GameCard";
 import { GameCover } from "../../components/GameCover";
 import { GameStatusSheet } from "../../components/GameStatusSheet";
 import { GamesFeedback } from "../../components/GamesFeedback";
-import { AddGameSheet } from "../../components/AddGameSheet";
+import { BottomNav, BOTTOM_NAV_SPACE } from "../../components/BottomNav";
 import { useGames, type StatKey } from "../../context/GamesContext";
 import { useAuth } from "../../context/AuthContext";
 
@@ -26,13 +26,12 @@ export function HomeScreen() {
   const { user } = useAuth();
   const { games, stats, loading, error, warning, reload } = useGames();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [addingGame, setAddingGame] = useState(false);
   const featured = games.find(game => game.status === "playing") ?? games[0];
   return (
     <View className="flex-1 bg-[#111318]">
       <StatusBar style="light" />
       <SafeAreaView edges={["top", "left", "right"]} className="flex-1">
-        <ScrollView contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}>
+        <ScrollView contentContainerStyle={{ paddingBottom: BOTTOM_NAV_SPACE + insets.bottom }}>
           <View className="flex-row items-center justify-between px-5 pt-4">
             <View className="flex-1 pr-4">
               <Text className="text-[32px] font-extrabold tracking-[-0.5px] text-[#E5E7EB]">Olá, {user?.name}</Text>
@@ -82,23 +81,9 @@ export function HomeScreen() {
           </>}
         </ScrollView>
       </SafeAreaView>
-      <View className="absolute bottom-0 left-0 right-0 flex-row items-center justify-around border-t border-white/5 bg-[#161A22] px-2 pt-3" style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
-        <NavItem label="Início" icon="home" active onPress={() => router.replace("/home")} />
-        <NavItem label="Biblioteca" icon="library-outline" onPress={() => router.push("/library")} />
-        <Pressable onPress={() => setAddingGame(true)} accessibilityRole="button" accessibilityLabel="Adicionar jogo"
-          className="-mt-8 h-14 w-14 items-center justify-center rounded-full bg-blue-500 active:opacity-85"><Ionicons name="add" size={30} color="#FFFFFF" /></Pressable>
-        <NavItem label="Descobrir" icon="compass-outline" onPress={() => router.push("/search")} />
-        <NavItem label="Perfil" icon="person-circle-outline" onPress={() => router.push("/profile")} />
-      </View>
+      <BottomNav active="home" />
       <GameStatusSheet gameId={selectedId} onClose={() => setSelectedId(null)} />
-      {addingGame && <AddGameSheet onClose={() => setAddingGame(false)} />}
     </View>
   );
-}
-function NavItem({ label, icon, active, onPress }: { label: string; icon: keyof typeof Ionicons.glyphMap; active?: boolean; onPress: () => void }) {
-  const color = active ? "#3B82F6" : "#9CA3AF";
-  return <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} className="items-center active:opacity-70">
-    <Ionicons name={icon} size={24} color={color} /><Text className="mt-1 text-xs font-medium" style={{ color }}>{label}</Text>
-  </Pressable>;
 }
 export default HomeScreen;
