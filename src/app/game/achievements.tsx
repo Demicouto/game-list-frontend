@@ -9,6 +9,7 @@ import { GameCover } from "../../components/GameCover";
 import { useLibraryGame } from "../../hooks/useLibraryGame";
 import { ApiError } from "../../services/api";
 import { achievementsApi } from "../../services/achievements-api";
+import { notifyAchievementUnlocked } from "../../services/notifications";
 import type { Achievement } from "../../types/achievement";
 import type { GameStatus } from "../../types/game";
 
@@ -88,6 +89,7 @@ export default function AchievementsPage() {
       if (unlocked) {
         const saved = await achievementsApi.unlock(gameId, item.id);
         if (mounted.current) setItems(list => list.map(current => current.id === saved.id ? saved : current));
+        void notifyAchievementUnlocked(saved.title, game?.title);
       } else {
         await achievementsApi.lock(gameId, item.id);
         if (mounted.current) setItems(list => list.map(current => current.id === item.id ? { ...current, unlocked: false, unlockedAt: null } : current));
@@ -97,7 +99,7 @@ export default function AchievementsPage() {
     } finally {
       if (mounted.current) setToggling(null);
     }
-  }, [gameId, toggling]);
+  }, [gameId, toggling, game?.title]);
 
   function onPressItem(item: Achievement) {
     if (!item.unlocked) { void setUnlocked(item, true); return; }
