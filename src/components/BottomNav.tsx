@@ -1,9 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, type Href } from "expo-router";
-import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { AddGameSheet } from "./AddGameSheet";
 
 export type BottomNavTab = "home" | "library" | "search" | "profile";
 
@@ -28,7 +26,6 @@ export const BOTTOM_NAV_SPACE = 120;
 export function BottomNav({ active }: { active: BottomNavTab }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [addingGame, setAddingGame] = useState(false);
 
   function renderTab(tab: TabItem) {
     const selected = tab.key === active;
@@ -44,18 +41,15 @@ export function BottomNav({ active }: { active: BottomNavTab }) {
   }
 
   return (
-    <>
-      <View accessibilityRole="tablist"
-        className="absolute bottom-0 left-0 right-0 flex-row items-center justify-around border-t border-white/5 bg-[#161A22] px-2 pt-3"
-        style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
-        {LEFT_TABS.map(renderTab)}
-        <Pressable onPress={() => setAddingGame(true)} accessibilityRole="button" accessibilityLabel="Adicionar jogo"
-          className="-mt-8 h-14 w-14 items-center justify-center rounded-full bg-blue-500 active:opacity-85">
-          <Ionicons name="add" size={30} color="#FFFFFF" accessible={false} />
-        </Pressable>
-        {RIGHT_TABS.map(renderTab)}
-      </View>
-      {addingGame && <AddGameSheet onClose={() => setAddingGame(false)} />}
-    </>
+    <View accessibilityRole="tablist"
+      className="absolute bottom-0 left-0 right-0 flex-row items-center justify-around border-t border-white/5 bg-[#161A22] px-2 pt-3"
+      style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
+      {LEFT_TABS.map(renderTab)}
+      <Pressable onPress={() => router.push("/game/add")} accessibilityRole="button" accessibilityLabel="Adicionar novo jogo"
+        className="-mt-8 h-14 w-14 items-center justify-center rounded-full bg-blue-500 active:opacity-85">
+        <Ionicons name="add" size={30} color="#FFFFFF" accessible={false} />
+      </Pressable>
+      {RIGHT_TABS.map(renderTab)}
+    </View>
   );
 }
