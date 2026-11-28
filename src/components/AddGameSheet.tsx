@@ -1,10 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { useState } from "react";
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { GAME_PRESETS } from "../data/game-presets";
+import { ApiError } from "../services/api";
+import { gamesApi } from "../services/games-api";
+import type { CatalogGame } from "../types/game";
 import SearchBar from "./SearchBar";
 
 type Props = { onClose: () => void };
@@ -14,13 +16,48 @@ export function AddGameSheet({ onClose }: Props) {
   const insets = useSafeAreaInsets();
   const [catalog, setCatalog] = useState(false);
   const [query, setQuery] = useState("");
-  const search = query.trim().toLocaleLowerCase();
-  const presets = GAME_PRESETS.filter(game => `${game.title} ${game.developer}`.toLocaleLowerCase().includes(search));
+  const [results, setResults] = useState<CatalogGame[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [selecting, setSelecting] = useState<string | null>(null);
 
-  function openForm(presetId?: string) {
+  // Busca no catálogo depois de uma pausa na digitação; a resposta anterior é cancelada.
+  useEffect(() => {
+    if (!catalog) return;
+    const controller = new AbortController();
+    setLoading(true); setError(null);
+    const timer = setTimeout(() => {
+      gamesApi.searchCatalog(query, controller.signal)
+        .then(items => { setResults(items); setLoading(false); })
+        .catch(failure => {
+          if (controller.signal.aborted) return;
+          setResults([]); setLoading(false);
+          setError(failure instanceof ApiError ? failure.message : "Não foi possível buscar jogos. Tente novamente.");
+        });
+    }, 350);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [catalog, query]);
+
+  function openForm() {
     onClose();
-    if (presetId) router.push({ pathname: "/game/add", params: { presetId } });
-    else router.push("/game/add");
+    router.push("/game/add");
+  }
+
+  // Jogo ainda não importado (id nulo) é trazido da IGDB antes de abrir o formulário.
+  async function pick(game: CatalogGame) {
+    const key = game.id ?? String(game.igdbId);
+    if (selecting) return;
+    setSelecting(key); setError(null);
+    try {
+      const ready = game.id ? game : await gamesApi.importCatalogGame(game.igdbId!);
+      onClose();
+      router.push({ pathname: "/game/add", params: {
+        catalogId: ready.id!, title: ready.title, developer: ready.developer ?? "", genre: ready.genre ?? "", coverUrl: ready.coverUrl ?? "",
+      } });
+    } catch (failure) {
+      setError(failure instanceof ApiError ? failure.message : "Não foi possível importar o jogo. Tente novamente.");
+      setSelecting(null);
+    }
   }
 
   return (
@@ -44,18 +81,26 @@ export function AddGameSheet({ onClose }: Props) {
             </Pressable>
           </View>
           <Text className="mb-5 text-sm leading-5 text-[#9CA3AF]">
-            {catalog ? "Escolha um predefinido e confirme os dados antes de salvar." : "Como você quer adicionar seu próximo jogo?"}
+            {catalog ? "Busque um jogo e confirme os dados antes de salvar." : "Como você quer adicionar seu próximo jogo?"}
           </Text>
           {catalog ? <>
-            <SearchBar value={query} onChangeText={setQuery} placeholder="Buscar jogo ou desenvolvedora…" accessibilityLabel="Buscar jogos predefinidos" />
+            <SearchBar value={query} onChangeText={setQuery} placeholder="Buscar jogo…" accessibilityLabel="Buscar jogos no catálogo" />
             <ScrollView keyboardShouldPersistTaps="handled" className="mt-3 shrink" contentContainerStyle={{ paddingBottom: 8 }}>
-              {presets.map(game => <Pressable key={game.id} onPress={() => openForm(game.id)} accessibilityRole="button"
-                accessibilityLabel={`Selecionar ${game.title}`} className="mb-2 flex-row items-center gap-3 rounded-2xl border border-[#252C3C] bg-[#1D2330] p-4 active:opacity-80">
-                <Image source={game.cover} contentFit="cover" style={{ width: 44, height: 58, borderRadius: 8 }} accessible={false} />
-                <View className="flex-1"><Text className="font-bold text-[#E5E7EB]">{game.title}</Text><Text className="mt-1 text-xs text-[#9CA3AF]">{game.developer} · {game.genre}</Text></View>
-                <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
-              </Pressable>)}
-              {presets.length === 0 && <Text className="py-8 text-center text-[#9CA3AF]">Nenhum jogo encontrado</Text>}
+              {results.map(game => {
+                const key = game.id ?? String(game.igdbId);
+                return <Pressable key={key} onPress={() => void pick(game)} disabled={!!selecting} accessibilityRole="button"
+                  accessibilityLabel={`Selecionar ${game.title}`} className="mb-2 flex-row items-center gap-3 rounded-2xl border border-[#252C3C] bg-[#1D2330] p-4 active:opacity-80">
+                  {game.coverUrl
+                    ? <Image source={{ uri: game.coverUrl }} contentFit="cover" style={{ width: 44, height: 58, borderRadius: 8 }} accessible={false} />
+                    : <View style={{ width: 44, height: 58, borderRadius: 8 }} className="bg-[#252C3C]" />}
+                  <View className="flex-1"><Text className="font-bold text-[#E5E7EB]">{game.title}</Text>
+                    <Text className="mt-1 text-xs text-[#9CA3AF]">{[game.developer, game.genre].filter(Boolean).join(" · ") || "Catálogo"}</Text></View>
+                  {selecting === key ? <ActivityIndicator color="#9CA3AF" /> : <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />}
+                </Pressable>;
+              })}
+              {loading && <ActivityIndicator className="py-8" color="#9CA3AF" accessibilityLabel="Buscando jogos" />}
+              {!loading && error && <Text accessibilityRole="alert" className="py-8 text-center text-[#F87171]">{error}</Text>}
+              {!loading && !error && results.length === 0 && <Text className="py-8 text-center text-[#9CA3AF]">Nenhum jogo encontrado</Text>}
             </ScrollView>
           </> : <View className="flex-row items-stretch gap-3">
             <Pressable onPress={() => setCatalog(true)} accessibilityRole="button" accessibilityLabel="Jogos existentes"

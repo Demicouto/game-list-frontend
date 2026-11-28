@@ -33,7 +33,17 @@ export type GameMetadataInput = {
   genre?: string | null;
   coverUrl?: string | null;
 };
+// Jogo do catálogo compartilhado; id nulo = ainda não importado da IGDB (use igdbId para importar).
+export type CatalogGame = {
+  id: string | null;
+  igdbId: number | null;
+  title: string;
+  developer: string | null;
+  genre: string | null;
+  coverUrl: string | null;
+};
 export type CreateGameInput = GameMetadataInput & {
+  catalogGameId?: string;
   status?: GameStatus | null;
   rating?: number | null;
   localCover?: string | null;
