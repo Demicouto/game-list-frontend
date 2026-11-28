@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FlatList, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { GameCard } from "../../components/GameCard";
@@ -37,7 +37,11 @@ export default function LibraryPage() {
   const { width } = useWindowDimensions();
   const { games, loading, error, warning, reload } = useGames();
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<LibraryFilter>("all");
+  // Outra tela pode abrir a biblioteca já filtrada, ex.: /library?filter=favorites (Perfil → "Ver todos").
+  const params = useLocalSearchParams<{ filter?: string }>();
+  const initialFilter = FILTERS.find(item => item.key === params.filter)?.key ?? "all";
+  const [filter, setFilter] = useState<LibraryFilter>(initialFilter);
+  useEffect(() => { setFilter(initialFilter); }, [initialFilter]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const contentWidth = Math.min(width - insets.left - insets.right, MAX_WIDTH);
   const cardWidth = (contentWidth - PADDING * 2 - GAP) / 2;
