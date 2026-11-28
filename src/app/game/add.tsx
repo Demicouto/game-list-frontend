@@ -20,7 +20,7 @@ import {
 } from "react-native-safe-area-context";
 import { SelectField, type SelectOption } from "../../components/SelectField";
 import { useGames } from "../../context/GamesContext";
-import type { Game, GameStatus } from "../../types/game";
+import type { CatalogGame, Game, GameStatus } from "../../types/game";
 import { useLibraryGame } from "../../hooks/useLibraryGame";
 import { GamesFeedback } from "../../components/GamesFeedback";
 import { ApiError } from "../../services/api";
@@ -53,7 +53,9 @@ const STATUSES: SelectOption<GameStatus | "none">[] = [
 ];
 
 export default function AddGameScreen() {
-  const { editId, presetId } = useLocalSearchParams<{ editId?: string; presetId?: string }>();
+  const { editId, presetId, catalogId, title, developer, genre, coverUrl } = useLocalSearchParams<{
+    editId?: string; presetId?: string; catalogId?: string; title?: string; developer?: string; genre?: string; coverUrl?: string;
+  }>();
   const { loading, error, reload, revision } = useGames();
   const record = useLibraryGame(editId);
   if (loading || error || editId && (record.loading || record.error || !record.game)) {
@@ -63,14 +65,18 @@ export default function AddGameScreen() {
     </SafeAreaView>;
   }
   const preset = editId ? undefined : findGamePreset(presetId);
-  return <GameForm key={`${revision}:${editId ?? preset?.id ?? "new"}`} existingGame={record.game} preset={preset} />;
+  // Jogo escolhido no catálogo: o backend usa os dados do catálogo, a tela só os mostra.
+  const catalog: CatalogGame | undefined = !editId && catalogId && title
+    ? { id: catalogId, igdbId: null, title, developer: developer || null, genre: genre || null, coverUrl: coverUrl || null }
+    : undefined;
+  return <GameForm key={`${revision}:${editId ?? catalogId ?? preset?.id ?? "new"}`} existingGame={record.game} preset={preset} catalog={catalog} />;
 }
 
-function GameForm({ existingGame, preset }: { existingGame?: Game; preset?: GamePreset }) {
+function GameForm({ existingGame, preset, catalog }: { existingGame?: Game; preset?: GamePreset; catalog?: CatalogGame }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { platforms, addGame, updateGame, warning, reload } = useGames();
-  const [name, setName] = useState(existingGame?.title ?? preset?.title ?? "");
+  const [name, setName] = useState(existingGame?.title ?? catalog?.title ?? preset?.title ?? "");
   const [platform, setPlatform] = useState<number | "">(
     existingGame?.platformId ?? "",
   );
@@ -79,7 +85,7 @@ function GameForm({ existingGame, preset }: { existingGame?: Game; preset?: Game
     existingGame ? (existingGame.status ?? "none") : "wishlist",
   );
   const [cover, setCover] = useState<ImageSource | undefined>(
-    existingGame?.cover ?? preset?.cover,
+    existingGame?.cover ?? (catalog?.coverUrl ? { uri: catalog.coverUrl } : preset?.cover),
   );
   const [coverReference, setCoverReference] = useState<string | null | undefined>(
     existingGame?.localCoverReference ?? (preset ? `preset:${preset.id}` : undefined),
@@ -161,13 +167,14 @@ function GameForm({ existingGame, preset }: { existingGame?: Game; preset?: Game
       nameInput.current?.focus();
       return;
     }
-    if (!platform || (!genre && !existingGame) || saving.current) return;
+    if (!platform || (!genre && !existingGame && !catalog) || saving.current) return;
     saving.current = true;
     setBusy(true); setError(null);
     const uri = typeof cover === "string" ? cover : cover?.uri;
     const localCover = coverReference !== undefined ? coverReference : uri && isLocalCoverUri(uri) ? uri : cover ? undefined : null;
     const data = { title: name.trim(), platformId: platform, genre: genre || null,
       ...(preset ? { developer: preset.developer } : {}),
+      ...(catalog?.id ? { catalogGameId: catalog.id } : {}),
       status: status === "none" ? null : status, localCover,
       ...(!cover ? { coverUrl: null } : {}) };
     try {
@@ -311,7 +318,7 @@ function GameForm({ existingGame, preset }: { existingGame?: Game; preset?: Game
                   submitted && !platform ? "Selecione a plataforma." : undefined
                 }
               />
-              <SelectField
+              {!catalog && <SelectField
                 label="Gênero"
                 disabled={busy}
                 value={genre}
@@ -322,7 +329,7 @@ function GameForm({ existingGame, preset }: { existingGame?: Game; preset?: Game
                     ? "Selecione o gênero."
                     : undefined
                 }
-              />
+              />}
               <SelectField
                 label="Status"
                 disabled={busy}

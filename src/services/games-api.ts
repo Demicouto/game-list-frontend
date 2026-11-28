@@ -1,5 +1,5 @@
 import { ApiError, apiClient, type ApiClient } from "./api";
-import type { ApiGameStatus, CreateGameInput, Game, GameMetadataInput, GamePlatform, GameStatus } from "../types/game";
+import type { ApiGameStatus, CatalogGame, CreateGameInput, Game, GameMetadataInput, GamePlatform, GameStatus } from "../types/game";
 
 const STATUSES: Record<ApiGameStatus, GameStatus> = {
   PLAYING: "playing", COMPLETED: "completed", PAUSED: "paused", WISHLIST: "wishlist",
@@ -38,6 +38,16 @@ export function mapGame(value: unknown): Game {
     platformId: itemPlatform.id, platform: itemPlatform.name, createdAt: value.createdAt, updatedAt: value.updatedAt,
   };
 }
+function mapCatalogGame(value: unknown): CatalogGame {
+  if (!record(value) || typeof value.title !== "string" || !value.title.trim()
+    || !(value.id === null || typeof value.id === "string" && !!value.id)
+    || !(value.igdbId === undefined || value.igdbId === null || Number.isInteger(value.igdbId))) return invalid();
+  const text = (field: unknown) => typeof field === "string" && field ? field : null;
+  return {
+    id: value.id as string | null, igdbId: (value.igdbId as number | null | undefined) ?? null, title: value.title,
+    developer: text(value.developer), genre: text(value.genre), coverUrl: isRemoteCoverUrl(value.coverUrl) ? value.coverUrl : null,
+  };
+}
 function metadata(input: Partial<GameMetadataInput>) {
   if (input.coverUrl != null && !isRemoteCoverUrl(input.coverUrl)) throw new ApiError(400, "A capa enviada à API deve usar uma URL HTTP(S).");
   const result: Partial<GameMetadataInput> = {};
@@ -60,8 +70,20 @@ export function createGamesApi(client: Pick<ApiClient, "request" | "isWeb">) {
       if (!Array.isArray(value)) return invalid();
       return value.map(platform);
     },
+    // Busca no catálogo (e na IGDB, via backend). Sem termo, devolve o que já foi importado.
+    async searchCatalog(term: string, signal?: AbortSignal) {
+      const query = term.trim() ? `?search=${encodeURIComponent(term.trim())}` : "";
+      const value = await client.request<unknown>(`/catalog/games${query}`, { signal });
+      if (!Array.isArray(value)) return invalid();
+      return value.map(mapCatalogGame);
+    },
+    // Traz o jogo da IGDB para o catálogo e devolve com o id usado em catalogGameId.
+    async importCatalogGame(igdbId: number, signal?: AbortSignal) {
+      return mapCatalogGame(await client.request(`/catalog/games/${igdbId}/import`, { method: "POST", signal }));
+    },
     async create(input: CreateGameInput, signal?: AbortSignal) {
       const body = { ...metadata(input),
+        ...(input.catalogGameId ? { catalogGameId: input.catalogGameId } : {}),
         ...(input.status !== undefined ? { status: input.status === null ? null : TO_API[input.status] } : {}),
         ...(input.rating !== undefined ? { rating: input.rating } : {}),
       };
