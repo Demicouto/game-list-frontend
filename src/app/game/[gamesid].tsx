@@ -1,8 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { SelectField, type SelectOption } from "../../components/SelectField";
@@ -11,7 +11,9 @@ import { GamesFeedback } from "../../components/GamesFeedback";
 import { useGames } from "../../context/GamesContext";
 import { useLibraryGame } from "../../hooks/useLibraryGame";
 import { ApiError } from "../../services/api";
+import { achievementsApi } from "../../services/achievements-api";
 import { isLocalCoverUri } from "../../services/local-covers";
+import type { AchievementProgress } from "../../types/achievement";
 import type { GameStatus } from "../../types/game";
 
 const STATUSES: SelectOption<GameStatus | "none">[] = [
@@ -37,6 +39,15 @@ function GameDetail({ id }: { id: string }) {
   const pending = useRef(false);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  // Recarrega o progresso sempre que a tela volta ao foco (por exemplo, ao voltar das Conquistas).
+  const [achievements, setAchievements] = useState<AchievementProgress | null>(null);
+  useFocusEffect(useCallback(() => {
+    const controller = new AbortController();
+    achievementsApi.progress(id, controller.signal)
+      .then(value => { if (!controller.signal.aborted) setAchievements(value); })
+      .catch(() => { /* Sem progresso, o cartão mostra só o atalho. */ });
+    return () => controller.abort();
+  }, [id]));
   async function run(action: () => Promise<unknown>, done?: () => void) {
     if (pending.current) return;
     pending.current = true; setBusy(true); setError(null);
@@ -101,7 +112,23 @@ function GameDetail({ id }: { id: string }) {
             </View>
             <SelectField label="STATUS" value={game.status ?? "none"} options={STATUSES} disabled={busy}
               onChange={status => void run(() => setStatus(game.id, status === "none" ? null : status))} />
-            {isLocalCoverUri(game.cover?.uri) && <Text className="text-xs text-[#9CA3AF]">Esta capa está disponível somente neste dispositivo.</Text>}
+            <Pressable onPress={() => router.push({ pathname: "/game/achievements", params: { gameId: game.id } })} accessibilityRole="button"
+              accessibilityLabel={achievements ? `Conquistas: ${achievements.unlocked} de ${achievements.total}` : "Conquistas"}
+              className="flex-row items-center gap-3 rounded-2xl bg-[#1E2024] p-3.5 active:opacity-80">
+              <View className="h-10 w-10 items-center justify-center rounded-xl bg-[#3A2A0E]">
+                <Ionicons name="trophy" size={20} color="#FBBF24" accessible={false} />
+              </View>
+              <View className="flex-1">
+                <Text className="text-xs font-semibold tracking-wider text-[#C1C6D5]">CONQUISTAS</Text>
+                <Text className="mt-0.5 text-base font-bold text-[#E5E7EB]">
+                  {achievements
+                    ? achievements.total > 0 ? `${achievements.unlocked} de ${achievements.total} · ${achievements.percent}%` : "Nenhuma cadastrada"
+                    : "Ver conquistas"}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#9CA3AF" accessible={false} />
+            </Pressable>
+            {isLocalCoverUri(game.cover?.uri) &&<Text className="text-xs text-[#9CA3AF]">Esta capa está disponível somente neste dispositivo.</Text>}
             <Pressable disabled={busy} onPress={() => router.push({ pathname: "/game/add", params: { editId: game.id } })} accessibilityRole="button"
               className="min-h-[52px] items-center justify-center rounded-xl bg-blue-600 px-4 py-3.5 active:opacity-85"><Text className="font-bold text-white">Editar jogo</Text></Pressable>
             <Pressable disabled={busy} onPress={() => setConfirmDelete(true)} accessibilityRole="button"
