@@ -9,7 +9,7 @@ export class ApiError extends Error {
 }
 
 export type ApiRequestOptions = {
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   signal?: AbortSignal;
   authenticated?: boolean;
@@ -54,14 +54,16 @@ export class ApiClient {
     const token = options.token === undefined ? this.token : options.token;
     const url = this.requestUrl(path);
     const headers: Record<string, string> = { Accept: "application/json" };
-    if (options.body !== undefined) headers["Content-Type"] = "application/json";
+    // FormData define o próprio Content-Type (com o boundary) e não passa por JSON.
+    const form = typeof FormData !== "undefined" && options.body instanceof FormData;
+    if (options.body !== undefined && !form) headers["Content-Type"] = "application/json";
     if (options.transport) headers["X-Auth-Transport"] = options.transport;
     if (!this.isWeb && authenticated && token) headers.Authorization = `Bearer ${token}`;
     let response: Response;
     try {
       response = await (this.options.fetcher ?? fetch)(url, {
         method: options.method ?? "GET", headers,
-        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        body: options.body === undefined ? undefined : form ? (options.body as FormData) : JSON.stringify(options.body),
         credentials: this.isWeb ? "include" : "omit",
         redirect: "error", signal: options.signal,
       });

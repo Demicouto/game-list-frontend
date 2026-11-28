@@ -46,7 +46,7 @@ function metadata(input: Partial<GameMetadataInput>) {
   }
   return result;
 }
-export function createGamesApi(client: Pick<ApiClient, "request">) {
+export function createGamesApi(client: Pick<ApiClient, "request" | "isWeb">) {
   const path = (id: string) => `/games/${encodeURIComponent(id)}`;
   return {
     async list(signal?: AbortSignal) {
@@ -75,6 +75,20 @@ export function createGamesApi(client: Pick<ApiClient, "request">) {
     },
     async favorite(id: string, signal?: AbortSignal) { return mapGame(await client.request(`${path(id)}/favorite`, { method: "PATCH", signal })); },
     async rating(id: string, rating: number, signal?: AbortSignal) { return mapGame(await client.request(`${path(id)}/rating`, { method: "PATCH", body: { rating }, signal })); },
+    // Envia a imagem do aparelho; a API guarda no Supabase Storage e devolve o jogo com a coverUrl pública.
+    async cover(id: string, uri: string, signal?: AbortSignal) {
+      const ext = /\.(png|webp)(?:$|[?#])/i.exec(uri)?.[1]?.toLowerCase() ?? "jpg";
+      const name = `capa.${ext}`;
+      const form = new FormData();
+      // Web: Blob. App nativo: o fetch do Expo SDK 57 não aceita o objeto { uri, name, type } do React Native,
+      // só um File do expo-file-system (importado aqui para não carregar o módulo nativo na Web).
+      if (client.isWeb) form.append("file", await (await fetch(uri)).blob(), name);
+      else {
+        const { File: LocalFile } = await import("expo-file-system");
+        form.append("file", new LocalFile(uri) as unknown as Blob);
+      }
+      return mapGame(await client.request(`${path(id)}/cover`, { method: "PUT", body: form, signal }));
+    },
     async remove(id: string, signal?: AbortSignal) { await client.request<void>(path(id), { method: "DELETE", signal }); },
   };
 }
