@@ -19,7 +19,7 @@ export default function RootLayout() {
     <AuthProvider>
       <GamesProvider>
         <ThemeProvider value={appTheme}>
-          <Stack screenOptions={{ headerShown: false }}>
+          <Stack screenOptions={{ headerShown: false, animation: "ios_from_right" }}>
             <Stack.Screen name="index" />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="(auth)" />

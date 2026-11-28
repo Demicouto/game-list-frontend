@@ -6,5 +6,5 @@ export default function AuthLayout() {
   const { status, cleanupPending } = useAuth();
   if (status === 'checking' || cleanupPending) return <SessionStatus />;
   if (status === 'authenticated') return <Redirect href="/home" />;
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return <Stack screenOptions={{ headerShown: false, animation: "ios_from_right" }} />;
 }
