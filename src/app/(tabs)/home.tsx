@@ -3,7 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
-import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { GameCard } from "../../components/GameCard";
 import { GameCover } from "../../components/GameCover";
@@ -37,10 +37,16 @@ export function HomeScreen() {
               <Text className="text-[32px] font-extrabold tracking-[-0.5px] text-[#E5E7EB]">Olá, {user?.name}</Text>
               <Text className="mt-0.5 text-base text-[#9CA3AF]">Pronto para jogar hoje?</Text>
             </View>
-            <Pressable onPress={() => router.push("/profile")} accessibilityRole="button" accessibilityLabel="Abrir meu perfil"
-              className="h-11 w-11 items-center justify-center rounded-full border-2 border-[#243149] bg-[#181D28] active:opacity-80">
-              <Ionicons name="person-outline" size={22} color="#E5E7EB" />
-            </Pressable>
+            <View className="flex-row gap-2">
+              <Pressable onPress={() => Alert.alert("Notificações", "Em breve.")} accessibilityRole="button" accessibilityLabel="Notificações"
+                className="h-11 w-11 items-center justify-center rounded-full border-2 border-[#243149] bg-[#181D28] active:opacity-80">
+                <Ionicons name="notifications-outline" size={20} color="#E5E7EB" accessible={false} />
+              </Pressable>
+              <Pressable onPress={() => router.push("/settings")} accessibilityRole="button" accessibilityLabel="Abrir configurações"
+                className="h-11 w-11 items-center justify-center rounded-full border-2 border-[#243149] bg-[#181D28] active:opacity-80">
+                <Ionicons name="settings-outline" size={20} color="#E5E7EB" accessible={false} />
+              </Pressable>
+            </View>
           </View>
           {(loading || error || warning || games.length === 0) && <GamesFeedback loading={loading} error={error} warning={warning}
             empty={games.length === 0} retry={() => void reload()} onAdd={() => router.push("/game/add")} />}
